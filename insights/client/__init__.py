@@ -6,6 +6,7 @@ import tempfile
 import shlex
 import shutil
 import sys
+import atexit
 from subprocess import Popen, PIPE
 from requests import ConnectionError
 
@@ -115,16 +116,22 @@ class InsightsClient(object):
             logger.warning("Unable to fetch egg url. Defaulting to /release")
             return '/release'
 
+    def cleanup(self):
+        if self.tmpdir:
+            logger.debug("Deleting temp directory to %s." % (self.tmpdir))
+            shutil.rmtree(self.tmpdir, True)
+
     def fetch(self, force=False):
         """
             returns (dict): {'core': path to new egg, None if no update,
                              'gpg_sig': path to new sig, None if no update}
         """
-        tmpdir = tempfile.mkdtemp()
+        self.tmpdir = tempfile.mkdtemp()
         fetch_results = {
-            'core': os.path.join(tmpdir, 'insights-core.egg'),
-            'gpg_sig': os.path.join(tmpdir, 'insights-core.egg.asc')
+            'core': os.path.join(self.tmpdir, 'insights-core.egg'),
+            'gpg_sig': os.path.join(self.tmpdir, 'insights-core.egg.asc')
         }
+        atexit.register(self.cleanup)
 
         logger.debug("Beginning core fetch.")
 
@@ -160,6 +167,8 @@ class InsightsClient(object):
                         force)
 
             return fetch_results
+        
+
 
     @_net
     def _fetch(self, path, etag_file, target_path, force):
